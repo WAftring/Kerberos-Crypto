@@ -1,14 +1,8 @@
-# Project
+# Kerberos-Crypto
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+This repository is maintained by the Windows Kerberos team and is intended as a way to share information regarding Kerberos crypto information and utility scripts.
 
-As the maintainer of this project, please make a few updates:
-
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+The utilities should be treated as useful utilities for building a security strategy regarding Kerberos crypto configuration and not explicit recommendations.
 
 ## Contributing
 
