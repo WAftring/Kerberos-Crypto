@@ -10,4 +10,4 @@ For help and questions about using this project, please create an issue with the
 
 ## Microsoft Support Policy  
 
-Support for this project is limited to the resources listed above.
+Support for this project is limited to the resources listed above and is **NOT** supported by Microsoft Customer Service & Support (CSS).
