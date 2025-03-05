@@ -135,6 +135,12 @@ if ([System.Environment]::OSVersion.Version.Build -gt 20348) {
     $script:AES_SHA1_FILTER = $script:AES_SHA1_FILTER_2025
 }
 
+<#
+    The new properties counts are 21 for 4769 and 24 for 4668. Meaning if we have a lower
+    property count then we are reading the old event data.
+#>
+$script:MIN_PROPERTY_COUNT = 21
+
 $script:KeyFilter = ""
 $script:NotKeyFilter = ""
 
@@ -208,6 +214,13 @@ else {
             Write-Error "Failed to get event logs from $KDCName with result: $_"
         }
     }
+}
+
+# Validate we are working with the correct version
+if ($accounts.Count -gt 0 -and $accounts[0].Properties.Count -lt $script:MIN_PROPERTY_COUNT) {
+    Write-Error "Attempting to run script on Windows Version $([System.Environment]::OSVersion.Version) which doesn't have the new event metadata.
+Please install the most recent Windows Updates available for this machine and attempt again."
+    return
 }
 
 $originalLimit = $FormatEnumerationLimit
