@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Kerberos EType Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    /* Input fields alignment */
+    .form-field {
+      margin-bottom: 10px;
+    }
+    .form-field label {
+      display: inline-block;
+      width: 150px; /* Adjust this for desired alignment */
+      text-align: right;
+      margin-right: 10px;
+    }
+        /* Radio button alignment */
+    .radio-group label {
+      display: inline-block;
+      margin-right: 20px;
+      vertical-align: middle;
+    }
+    /* Style for the result section */
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      width: 350px;
+    }
+    .result-field {
+      margin-bottom: 10px;
+    }
+    .result-field label {
+      display: inline-block;
+      width: 150px; /* Same as input labels for alignment */
+      text-align: right;
+      margin-right: 10px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 5px 10px;
+    }
+  </style>
+  <script>
+    const AES_SHA2_BITS = 0xc0;
+    const DOMAIN_SET = 0x1c;
+    const KRBTGT_SET = 0x18;
+    const ETYPE_MAP = new Map()
+      .set(0x80, "AES256-SHA2")
+      .set(0x40, "AES128-SHA2")
+      // .set(0x20, "AES-SK")
+      .set(0x10, "AES256-SHA1")
+      .set(0x08, "AES128-SHA1")
+      .set(0x04, "RC4")
+      .set(0x02, "DES-MD5")
+      .set(0x01, "DES-CRC")
+      .set(0x00, "NONE");
+
+    // Validate if a given string is a valid hexadecimal value between 0 and 0xff.
+    function validateHex(value) {
+      let hexValue = value.trim();
+      // Remove optional '0x' prefix if present.
+      if (hexValue.startsWith("0x") || hexValue.startsWith("0X")) {
+        hexValue = hexValue.substring(2);
+      }
+      // Match one or two hex digits.
+      if (!/^[0-9A-Fa-f]{1,2}$/.test(hexValue)) return false;
+      let num = parseInt(hexValue, 16);
+      return num >= 0 && num <= 0xff;
+    }
+
+    function findMaxEtype(value) {
+      for (let [key, _] of ETYPE_MAP) {
+        if ((key & value) === key) {
+          return key;
+        }
+      }
+      return 0x00;
+    }
+
+    function calculate() {
+      // Checkboxes (currently not used in logic, but they could modify the calculations).
+      const isKrbtgtChecked = document.getElementById('krbtgt').checked;
+      const isSubsessionChecked = document.getElementById('subsession').checked;
+
+      // Retrieve input values.
+      const sourceValue = document.getElementById('source').value;
+      const kdcValue = document.getElementById('kdc').value;
+      const targetValue = document.getElementById('target').value;
+
+      // Validate values.
+      if (!validateHex(sourceValue)) {
+        alert("Invalid value for 'Source msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+        return;
+      }
+      if (!validateHex(kdcValue)) {
+        alert("Invalid value for 'KDC msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+        return;
+      }
+      if (!validateHex(targetValue)) {
+        alert("Invalid value for 'Target msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+        return;
+      }
+
+      // Convert input string values to numbers.
+      const sourceNum = parseInt(sourceValue, 16);
+      const kdcNum = parseInt(kdcValue, 16);
+      const targetNum = parseInt(targetValue, 16);
+
+      // Perform bitwise operations to compute ETypes.
+      let ticketEType = 0
+      let sessionKeyEType = 0
+      if (isKrbtgtChecked) {
+        ticketEType = findMaxEtype(kdcValue & KRBTGT_SET)
+        sessionKeyEType = findMaxEtype(sourceValue & KRBTGT_SET & kdcValue)
+      } else if (isSubsessionChecked) {
+        ticketEType = findMaxEtype(sourceValue & targetValue)
+        sessionKeyEType = findMaxEtype(sourceValue & targetValue)
+      } else {
+          ticketEType = findMaxEtype(targetNum & kdcNum);
+          sessionKeyEType = findMaxEtype(targetNum & kdcNum & sourceNum);
+      }
+
+      // Update results (only the value, labels remain static for alignment).
+      document.getElementById('target-result').textContent = isKrbtgtChecked ? "krbtgt/contoso.com" : "HOST/target.contoso.com";
+      document.getElementById('ticket-result').textContent = "0x" + ticketEType.toString(16).padStart(2, '0') + " (" + ETYPE_MAP.get(ticketEType) + ")";
+      document.getElementById('session-result').textContent = "0x" + sessionKeyEType.toString(16).padStart(2, '0') + " (" + ETYPE_MAP.get(sessionKeyEType) + ")";
+    }
+  </script>
+</head>
+<body>
+  <h2>Kerberos EType Calculator</h2>
+
+  <!-- Input Fields with consistent alignment -->
+  <div>
+    <div class="form-field">
+      <label for="source">Source msds-SET:</label>
+      <input type="text" id="source" placeholder="Enter source value">
+    </div>
+    <div class="form-field">
+      <label for="kdc">KDC msds-SET:</label>
+      <input type="text" id="kdc" placeholder="Enter KDC value">
+    </div>
+    <div class="form-field">
+      <label for="target">Target msds-SET:</label>
+      <input type="text" id="target" placeholder="Enter target value">
+    </div>
+  </div>
+
+  <!-- Radio Buttons for selecting the key type -->
+  <div class="radio-group">
+    <label for="krbtgt">
+      <input type="radio" id="krbtgt" name="keyType" value="krbtgt"> Krbtgt
+    </label>
+    <label for="subsession">
+      <input type="radio" id="subsession" name="keyType" value="subsession"> Subsession key
+    </label>
+    <label>
+        <input type="radio" name="keyType"> None
+    </label> 
+  </div>
+
+  <!-- Calculate Button -->
+  <div>
+    <button type="button" onclick="calculate()">Calculate</button>
+  </div>
+
+  <!-- Result Section with aligned output -->
+  <div class="result" id="result">
+    <div class="result-field">
+        <label>Target:</label>
+        <span id="target-result"></span>
+    </div>
+    <div class="result-field">
+      <label>Ticket EType:</label>
+      <span id="ticket-result"></span>
+    </div>
+    <div class="result-field">
+      <label>Session Key EType:</label>
+      <span id="session-result"></span>
+    </div>
+  </div>
+</body>
+</html>
