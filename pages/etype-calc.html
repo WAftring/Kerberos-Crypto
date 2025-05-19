@@ -19,7 +19,7 @@
 
         .form-field label {
             display: inline-block;
-            width: 150px;
+            width: 175px;
             /* Adjust this for desired alignment */
             text-align: right;
             margin-right: 10px;
@@ -172,7 +172,7 @@
             <input type="text" id="target" placeholder="0x1c">
         </div>
         <div class="form-field">
-            <label for="ddset">DefaultDomainSupportedEncryptionTypes:</label>
+            <label for="ddset">Default Domain SET:</label>
             <input type="text" id="ddset" placeholder="0x27">
         </div>
     </div>
@@ -212,6 +212,13 @@
     </div>
 
     <div id="content">
+        <h3>What is this?</h3>
+        <p>This calculator is intended to help build a high level understanding of how Kerberos encryption type (etype) selection works within Windows environments.</p>
+        <p>Abbreviations:</p>
+        <ul>
+            <li>msds-SET: <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ada2/a75d1c3f-0bb3-470c-99bd-2bb557119483">msds-SupportedEncryptionTypes</a></li>
+            <li>Default Domain SET: <a href="https://support.microsoft.com/en-us/topic/kb5021131-how-to-manage-the-kerberos-protocol-changes-related-to-cve-2022-37966-fd837ac3-cdec-4e76-a6ec-86e67501407d#:~:text=the%20Kerberos%20protocol%3A-,DefaultDomainSupportedEncTypes,-Registry%20key">DefaultDomainSupportedEnc</a></li>
+        </ul>
         <h3>Caveats</h3>
         <p>This calculator operates with a few assumptions.
         <ul>
@@ -219,7 +226,6 @@
             <li>The msds-SET is accurately reflecting what the accounts are capable of</li>
         </ul>
         </p>
-        <br />
         <h3>Additional Reading:</h3>
         <ul>
             <li><a
