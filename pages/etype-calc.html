@@ -94,7 +94,7 @@
             BigInt(0x4),
             BigInt(0x8),
             BigInt(0x10),
-            BigInt(0x7FFFFFF00)
+            BigInt(0x7fffff00)
         ];
 
         function radioChanged(option) {
@@ -171,14 +171,14 @@
                 hexValue = hexValue.substring(2);
             }
             // Match one or two hex digits.
-            if (!/^[0-9A-Fa-f]{1,2}$/.test(hexValue)) return false;
+            if (!/^[0-9A-Fa-f]{1,8}$/.test(hexValue)) return false;
             let num = parseInt(hexValue, 16);
-            return num >= 0 && num <= 0xff;
+            return num >= 0 && num <= 0xffffffff;
         }
 
         function checkAesSk(value) {
-            if ((value & 0x20) === 0x20) {
-                value = value & ~0x20;
+            if ((value & AES_SK_BITS) === AES_SK_BITS) {
+                value = value & ~AES_SK_BITS;
                 value |= AES_SHA1_BITS;
             }
             return value;
@@ -424,6 +424,7 @@
             <li>KDC: <a href="https://learn.microsoft.com/en-us/windows/win32/secauthn/key-distribution-center">Key
                     Distribution Center</a></li>
             <li>Subsession Key: The key that can be negotiated after the initial session is setup between client and server.</li>
+            <li>Future ETypes: This configuration is used to enable future etypes by default when they are released.</li>
         </ul>
         <h3>Caveats</h3>
         <p>This calculator operates with a few assumptions.
