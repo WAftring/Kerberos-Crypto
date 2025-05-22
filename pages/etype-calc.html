@@ -222,19 +222,19 @@
 
             // Validate values.
             if (!validateHex(sourceValue)) {
-                alert("Invalid value for 'Source msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+                alert("Invalid value for 'Client'. Please enter a valid hexadecimal value between 0 and 0xff.");
                 return;
             }
             if (!validateHex(kdcValue)) {
-                alert("Invalid value for 'KDC msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+                alert("Invalid value for 'KDC'. Please enter a valid hexadecimal value between 0 and 0xff.");
                 return;
             }
             if (!validateHex(targetValue)) {
-                alert("Invalid value for 'Target msds-SET'. Please enter a valid hexadecimal value between 0 and 0xff.");
+                alert("Invalid value for 'Server'. Please enter a valid hexadecimal value between 0 and 0xff.");
                 return;
             }
             if (!validateHex(ddsetValue)) {
-                alert("Invalid value for 'DefaultDomainSupportedEncryptionTypes'. Please enter a valid hexadecimal value between 0 and 0xff.");
+                alert("Invalid value for 'Domain'. Please enter a valid hexadecimal value between 0 and 0xff.");
                 return;
             }
 
@@ -303,7 +303,7 @@
             <table>
                 <tr>
                     <th>Configuration Location</th>
-                    <th>Value</th>
+                    <th>msds-SET</th>
                     <th>DES-CRC</th>
                     <th>DES-MD5</th>
                     <th>RC4</th>
@@ -418,11 +418,12 @@
             <li>msds-SET: <a
                     href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ada2/a75d1c3f-0bb3-470c-99bd-2bb557119483">msds-SupportedEncryptionTypes</a>
                 the etypes that are supported by the account.</li>
-            <li>Default Domain SET: <a
+            <li>Default Domain ETypes: <a
                     href="https://support.microsoft.com/en-us/topic/kb5021131-how-to-manage-the-kerberos-protocol-changes-related-to-cve-2022-37966-fd837ac3-cdec-4e76-a6ec-86e67501407d#:~:text=the%20Kerberos%20protocol%3A-,DefaultDomainSupportedEncTypes,-Registry%20key">DefaultDomainSupportedEnc</a>
                 the assumed supported encryption types for the domain if no msds-SET is defined for the account.</li>
             <li>KDC: <a href="https://learn.microsoft.com/en-us/windows/win32/secauthn/key-distribution-center">Key
                     Distribution Center</a></li>
+            <li>Subsession Key: The key that can be negotiated after the initial session is setup between client and server.</li>
         </ul>
         <h3>Caveats</h3>
         <p>This calculator operates with a few assumptions.
