@@ -57,7 +57,7 @@ class KerbRegDwordSetting
         $this.Init($name, $defaultValue, $null)
     }
 
-    [pscustomobject] Verbose()
+    [pscustomobject] Detailed()
     {
         return [pscustomobject]@{
             Name = $this.Name
@@ -270,7 +270,7 @@ AllowTgtSessionKey       False                               0            0     
             foreach($key in $script:KEYS) {
                 if ($key.Name -eq $name) {
                     if ($Detailed) {
-                        $key.Verbose()
+                        $key.Detailed()
                     } else {
                         $key
                     }
@@ -279,7 +279,7 @@ AllowTgtSessionKey       False                               0            0     
         }
     } else {
         if ($Detailed) {
-            $script:KEYS | ForEach-Object { $_.Verbose() } | Format-Table
+            $script:KEYS | ForEach-Object { $_.Detailed() } | Format-Table
         } else {
             $script:KEYS
         }
