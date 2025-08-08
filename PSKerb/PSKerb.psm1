@@ -3,17 +3,17 @@
 $script:KEY_PATH = "Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters"
 
 class EncryptionType {
-        [uint]$Mask
+        [int]$Mask
         [int]$Value
         [string]$Name
 
-        EncryptionType([uint]$m, [int]$v, [string]$n) {
+        EncryptionType([int]$m, [int]$v, [string]$n) {
                 $this.Mask = $m
                 $this.Value =$v
                 $this.Name = $n
         }
 
-        [bool] EnabledInMask([uint]$mask) {
+        [bool] EnabledInMask([int]$mask) {
             return ($mask -band $this.Mask) -eq $this.Mask
         }
 }
@@ -21,8 +21,8 @@ class EncryptionType {
 class KerbRegDwordSetting
 {
     [string]$Name
-    hidden [uint]$Value
-    hidden [uint]$DefaultValue
+    hidden [int]$Value
+    hidden [int]$DefaultValue
     hidden [bool]$IsDefined
     [string]$Setting
 
@@ -92,7 +92,7 @@ $script:ETYPES = (
 )
 
 $script:KEY_SET = [KerbRegDwordSetting]::new("SupportedEncryptionTypes", 0x1c, {
-        param([uint]$mask)
+        param([int]$mask)
         $etypes_string = ""
 
         foreach($etype in $script:ETYPES) {
@@ -174,7 +174,70 @@ $script:KEYS = (
 #region Functions
 
 function Get-KerbConfig {
-    [CmdletBinding()]
+    <#
+.SYNOPSIS
+Get-KerbConfig displays the current Windows Kerberos client registry based configurations.
+.DESCRIPTION
+Get-KerbConfig reads the current registry values for the Windows Kerberos client to determine what the state of the Kerberos client configurations are.
+.PARAMETER Configurations
+A list of configuration names to be displayed. Otherwise, all configurations will be displayed.
+.PARAMETER Detailed
+Display the current unparsed setting along with if the configuration has been adjusted from the default value.
+.EXAMPLE
+Get-KerbConfig
+
+Name                     Setting
+----                     -------
+SupportedEncryptionTypes RC4, AES128-SHA96, AES256-SHA96
+SkewTime                 5 minutes
+LogLevel                 0
+MaxPacketSize            1465 bytes
+StartupTime              120 seconds
+KdcWaitTime              10 seconds
+KdcBackoffTime           10 seconds
+KdcSendRetries           3
+DefaultEncryptionType    AES256-SHA96
+FarKdcTimeout            10 minutes
+NearKdcTimeout           30 minutes
+StronglyEncryptDatagram  1
+MaxReferralCount         6
+MaxTokenSize             48000
+SpnCacheTimeout          15 minutes
+S4UCacheTimeout          15 minutes
+S4UTicketLifetime        15 minutes
+RetryPdc                 False
+RequestOptions           0x10000
+ClientIpAddresses        False
+TgtRenewalTime           600 seconds
+AllowTgtSessionKey       False
+.EXAMPLE
+Get-KerbConfig -Detailed
+
+Name                     Setting                         Value DefaultValue IsDefined IsDefault
+----                     -------                         ----- ------------ --------- ---------
+SupportedEncryptionTypes RC4, AES128-SHA96, AES256-SHA96    28           28     False      True
+SkewTime                 5 minutes                           5            5     False      True
+LogLevel                 0                                   0            0     False      True
+MaxPacketSize            1465 bytes                       1465         1465     False      True
+StartupTime              120 seconds                       120          120     False      True
+KdcWaitTime              10 seconds                         10           10     False      True
+KdcBackoffTime           10 seconds                         10           10     False      True
+KdcSendRetries           3                                   3            3     False      True
+DefaultEncryptionType    AES256-SHA96                       18           18     False      True
+FarKdcTimeout            10 minutes                         10           10     False      True
+NearKdcTimeout           30 minutes                         30           30     False      True
+StronglyEncryptDatagram  1                                   1            1     False      True
+MaxReferralCount         6                                   6            6     False      True
+MaxTokenSize             48000                           48000        48000     False      True
+SpnCacheTimeout          15 minutes                         15           15     False      True
+S4UCacheTimeout          15 minutes                         15           15     False      True
+S4UTicketLifetime        15 minutes                         15           15     False      True
+RetryPdc                 False                               0            0     False      True
+RequestOptions           0x10000                         65536        65536     False      True
+ClientIpAddresses        False                               0            0     False      True
+TgtRenewalTime           600 seconds                       600          600     False      True
+AllowTgtSessionKey       False                               0            0     False      True
+#>
     param(
         [ValidateSet("All",
     "SupportedEncryptionTypes",
@@ -198,16 +261,15 @@ function Get-KerbConfig {
     "ClientIpAddresses",
     "TgtRenewalTime",
     "AllowTgtSessionKey")]
-        [string[]]$Configurations = "All"
+        [string[]]$Configurations = "All",
+        [switch]$Detailed
     )
-
-    $IsVerbose = $PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent
 
     if ("All" -ne $Configurations[0]) {
         foreach($name in $Configurations) {
             foreach($key in $script:KEYS) {
                 if ($key.Name -eq $name) {
-                    if ($IsVerbose) {
+                    if ($Detailed) {
                         $key.Verbose()
                     } else {
                         $key
@@ -216,7 +278,7 @@ function Get-KerbConfig {
             }
         }
     } else {
-        if ($IsVerbose) {
+        if ($Detailed) {
             $script:KEYS | ForEach-Object { $_.Verbose() } | Format-Table
         } else {
             $script:KEYS
