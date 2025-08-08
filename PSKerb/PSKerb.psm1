@@ -178,7 +178,7 @@ function Get-KerbConfig {
 .SYNOPSIS
 Get-KerbConfig displays the current Windows Kerberos client registry based configurations.
 .DESCRIPTION
-Get-KerbConfig reads the current registry values for the Windows Kerberos client to determine what the state of the Kerberos client configurations are.
+Get-KerbConfig reads the current registry values for the Windows Kerberos client to determine what the state of the Kerberos client is. These configurations are based around the publicy documented keys here: https://learn.microsoft.com/en-us/troubleshoot/windows-server/windows-security/kerberos-protocol-registry-kdc-configuration-keys
 .PARAMETER Configurations
 A list of configuration names to be displayed. Otherwise, all configurations will be displayed.
 .PARAMETER Detailed
