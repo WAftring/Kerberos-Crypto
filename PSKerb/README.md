@@ -27,7 +27,6 @@ Update-Module PSKerb
 Display the current Microsoft Windows Kerberos client configuration.
 
 ```powershell
-
 Name                     Setting
 ----                     -------
 SupportedEncryptionTypes RC4, AES128-SHA96, AES256-SHA96

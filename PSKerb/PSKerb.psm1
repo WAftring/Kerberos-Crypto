@@ -273,18 +273,17 @@ AllowTgtSessionKey       False                               0            0     
     }
 
     process {
-
-        if ($PSCmdlet.ParameterSetName -eq "All") {
-            $script:KEYS | ForEach-Object {
-                $_.Update()
-                $_.Display($Detailed)
-            }
+        $selectedKeys = if ($PSCmdlet.ParameterSetName -eq "All") {
+            $script:KEYS
         } else {
-            $script:KEYS | Where-Object { $Configurations.Contains($_.Name) } | ForEach-Object {
-                $_.Update()
-                $_.Display($Detailed)
-            }
+            $script:KEYS | Where-Object { $Configurations.Contains($_.Name) }
         }
+
+        $selectedKeys | ForEach-Object {
+            $_.Update()
+            $_.Display($Detailed)
+        }
+
     }
 
     end {
