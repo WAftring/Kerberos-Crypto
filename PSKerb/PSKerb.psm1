@@ -3,77 +3,85 @@
 $script:KEY_PATH = "Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters"
 
 class EncryptionType {
-        [int]$Mask
-        [int]$Value
-        [string]$Name
+    [int]$Mask
+    [int]$Value
+    [string]$Name
 
-        EncryptionType([int]$m, [int]$v, [string]$n) {
-                $this.Mask = $m
-                $this.Value =$v
-                $this.Name = $n
-        }
+    EncryptionType([int]$m, [int]$v, [string]$n) {
+        $this.Mask = $m
+        $this.Value = $v
+        $this.Name = $n
+    }
 
-        [bool] EnabledInMask([int]$mask) {
-            return ($mask -band $this.Mask) -eq $this.Mask
-        }
+    [bool] EnabledInMask([int]$mask) {
+        return ($mask -band $this.Mask) -eq $this.Mask
+    }
 }
 
-class KerbRegDwordSetting
-{
+class KerbRegDwordSetting {
     [string]$Name
     hidden [int]$Value
     hidden [int]$DefaultValue
     hidden [bool]$IsDefined
+    hidden [scriptblock]$Callback
     [string]$Setting
 
-    hidden [void] Init($name, $defaultValue, $callback)
-    {
+    hidden [void] Init($name, $defaultValue, $callback) {
         $this.Name = $name
         $this.DefaultValue = $defaultValue
+        $this.Callback = $callback
+        $this.IsDefined = $false
+        $this.Setting = ""
+    }
 
+    [void] Update() {
         try {
             $this.Value = Get-ItemPropertyValue -Path $script:KEY_PATH -Name $this.Name -ErrorAction Stop
             $this.IsDefined = $true
         }
         catch {
+            Write-Verbose "Exception while processing registry key $script:KEY_PATH with value $($this.Name)`n$_)"
             $this.Value = $this.DefaultValue
             $this.IsDefined = $false
         }
 
-        if ($null -ne $callback) {
-            $this.Setting = $callback.Invoke($this.Value)
-        } else {
+        if ($null -ne $this.Callback) {
+            $this.Setting = $this.Callback.Invoke($this.Value)
+        }
+        else {
             $this.Setting = $this.Value
         }
     }
 
-    KerbRegDwordSetting($name, $defaultValue, $callback)
-    {
+    KerbRegDwordSetting($name, $defaultValue, $callback) {
         $this.Init($name, $defaultValue, $callback)
     }
 
-    KerbRegDwordSetting($name, $defaultValue)
-    {
+    KerbRegDwordSetting($name, $defaultValue) {
         $this.Init($name, $defaultValue, $null)
     }
 
-    [pscustomobject] Detailed()
-    {
-        return [pscustomobject]@{
-            Name = $this.Name
-            Setting = $this.Setting
-            Value = $this.Value
-            DefaultValue = $this.DefaultValue
-            IsDefined = $this.IsDefined
-            IsDefault = $this.Value -eq $this.DefaultValue
+    [pscustomobject] Display([bool]$detailed) {
+        $obj = [pscustomobject]@{
+            Name         = $this.Name
+            Setting      = $this.Setting
         }
+
+        if ($detailed) {
+            Add-Member -InputObject $obj -Name "Value" -Value $this.Value
+            Add-Member -InputObject $obj -Name "DefaultValue" -Value $this.DefaultValue
+            Add-Member -InputObject $obj -Name "IsDefined" -Value $this.IsDefined
+            Add-Member -InputObject $obj -Name "IsDefault" -Value $this.Value -eq $this.DefaultValue
+        }
+
+        return $obj
     }
 }
 
 #region definitions
 
 $script:DES_CRC = [EncryptionType]::new(0x1, 1, "DES-CRC")
-$script:DES_MD5 = [EncryptionType]::new(0x2, 3,"DES-MD5")
+$script:DES_MD5 = [EncryptionType]::new(0x2, 3, "DES-MD5")
 $script:RC4 = [EncryptionType]::new(0x4, -128, "RC4")
 $script:AES128 = [EncryptionType]::new(0x8, 17, "AES128-SHA96")
 $script:AES256 = [EncryptionType]::new(0x10, 18, "AES256-SHA96")
@@ -95,9 +103,9 @@ $script:KEY_SET = [KerbRegDwordSetting]::new("SupportedEncryptionTypes", 0x1c, {
         param([int]$mask)
         $etypes_string = ""
 
-        foreach($etype in $script:ETYPES) {
+        foreach ($etype in $script:ETYPES) {
 
-            if($etype.EnabledInMask($mask)) {
+            if ($etype.EnabledInMask($mask)) {
                 if (-not [string]::IsNullOrEmpty($etypes_string)) {
                     $etypes_string += ", "
                 }
@@ -112,7 +120,7 @@ $script:KEY_SET = [KerbRegDwordSetting]::new("SupportedEncryptionTypes", 0x1c, {
         return $etypes_string.TrimEnd()
     })
 
-$script:KEY_SKEWTIME = [KerbRegDwordSetting]::new("SkewTime", 5, { return "$args minutes"})
+$script:KEY_SKEWTIME = [KerbRegDwordSetting]::new("SkewTime", 5, { return "$args minutes" })
 $script:KEY_LOGLEVEL = [KerbRegDwordSetting]::new("LogLevel", 0)
 $script:KEY_MAXPACKETSIZE = [KerbRegDwordSetting]::new("MaxPacketSize", 1465, { return "$args bytes" })
 $script:KEY_STARTUPTIME = [KerbRegDwordSetting]::new("StartupTime", 120, { return "$args seconds" })
@@ -120,14 +128,14 @@ $script:KEY_KDCWAITTIME = [KerbRegDwordSetting]::new("KdcWaitTime", 10, { return
 $script:KEY_KDCBACKOFFTIME = [KerbRegDwordSetting]::new("KdcBackoffTime", 10, { return "$args seconds" })
 $script:KEY_KDCSENDRETRIES = [KerbRegDwordSetting]::new("KdcSendRetries", 3)
 $script:KEY_DEFAULTENCRYPTIONTYPE = [KerbRegDwordSetting]::new("DefaultEncryptionType", 18, {
-    param([int]$value)
-    foreach($etype in $script:ETYPES) {
-        if ($etype.Value -eq $value) {
-            return $etype.Name
+        param([int]$value)
+        foreach ($etype in $script:ETYPES) {
+            if ($etype.Value -eq $value) {
+                return $etype.Name
+            }
         }
-    }
-    return "None"
-})
+        return "None"
+    })
 $script:KEY_FARKDCTIMEOUT = [KerbRegDwordSetting]::new("FarKdcTimeout", 10, { return "$args minutes" })
 $script:KEY_NEARKDCTIMEOUT = [KerbRegDwordSetting]::new("NearKdcTimeout", 30, { return "$args minutes" })
 $script:KEY_STRONGLYENCRYPTDATAGRAM = [KerbRegDwordSetting]::new("StronglyEncryptDatagram", 1, { return $args -eq 1 })
@@ -136,7 +144,7 @@ $script:KEY_MAXTOKENSIZE = [KerbRegDwordSetting]::new("MaxTokenSize", 48000)
 $script:KEY_SPNCACHETIMEOUT = [KerbRegDwordSetting]::new("SpnCacheTimeout", 15, { return "$args minutes" })
 $script:KEY_S4UCACHETIMEOUT = [KerbRegDwordSetting]::new("S4UCacheTimeout", 15, { return "$args minutes" })
 $script:KEY_S4UTICKETLIFETIME = [KerbRegDwordSetting]::new("S4UTicketLifetime", 15, { return "$args minutes" })
-$script:KEY_RETRYPDC = [KerbRegDwordSetting]::new("RetryPdc", 0, {  if ($args -ne 0) {"True"} else {"False"} })
+$script:KEY_RETRYPDC = [KerbRegDwordSetting]::new("RetryPdc", 0, { if ($args -ne 0) { "True" } else { "False" } })
 $script:KEY_REQUESTOPTIONS = [KerbRegDwordSetting]::new("RequestOptions", 0x00010000, { return "0x{0:x}" -f $args })
 $script:KEY_CLIENTIPADDRESSES = [KerbRegDwordSetting]::new("ClientIpAddresses", 0, { if ($args -ne 0) { "True" } else { "False" } })
 $script:KEY_TGTRENEWALTIME = [KerbRegDwordSetting]::new("TgtRenewalTime", 600, { return "$args seconds" })
@@ -238,50 +246,50 @@ ClientIpAddresses        False                               0            0     
 TgtRenewalTime           600 seconds                       600          600     False      True
 AllowTgtSessionKey       False                               0            0     False      True
 #>
+    [CmdletBinding(DefaultParameterSetName = "All")]
     param(
-        [ValidateSet("All",
-    "SupportedEncryptionTypes",
-    "SkewTime",
-    "LogLevel",
-    "MaxPacketSize",
-    "StartupTime",
-    "KdcWaitTime",
-    "KdcBackoffTime",
-    "KdcSendRetries",
-    "DefaultEncryptionType",
-    "FarKdcTimeout",
-    "NearKdcTimeout",
-    "StronglyEncryptDatagram",
-    "MaxReferralCount",
-    "MaxTokenSize",
-    "SpnCacheTimeout",
-    "S4UTicketLifetime",
-    "RetryPdc",
-    "RequestOptions",
-    "ClientIpAddresses",
-    "TgtRenewalTime",
-    "AllowTgtSessionKey")]
-        [string[]]$Configurations = "All",
+        [Parameter(ValueFromPipeline, ParameterSetName = "Configurations", Mandatory)]
+        [ValidateSet(
+            "SupportedEncryptionTypes", "SkewTime", "LogLevel", "MaxPacketSize", "StartupTime",
+            "KdcWaitTime", "KdcBackoffTime", "KdcSendRetries", "DefaultEncryptionType",
+            "FarKdcTimeout", "NearKdcTimeout", "StronglyEncryptDatagram", "MaxReferralCount",
+            "MaxTokenSize", "SpnCacheTimeout", "S4UTicketLifetime", "RetryPdc", "RequestOptions",
+            "ClientIpAddresses", "TgtRenewalTime", "AllowTgtSessionKey")]
+        [string[]]$Configurations,
+
+        [Parameter(ParameterSetName = "All")]
+        [switch]$All,
+
+        [Parameter()]
         [switch]$Detailed
     )
 
-    if ("All" -ne $Configurations[0]) {
-        foreach($name in $Configurations) {
-            foreach($key in $script:KEYS) {
-                if ($key.Name -eq $name) {
-                    if ($Detailed) {
-                        $key.Detailed()
-                    } else {
-                        $key
-                    }
-                }
+    begin {
+        $originalPreference = $null
+        if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"]) {
+            $originalPreference = $VerbosePreference
+            $VerbosePreference = 'Continue'
+        }
+    }
+
+    process {
+
+        if ($PSCmdlet.ParameterSetName -eq "All") {
+            $script:KEYS | ForEach-Object {
+                $_.Update()
+                $_.Display($Detailed)
+            }
+        } else {
+            $script:KEYS | Where-Object { $Configurations.Contains($_.Name) } | ForEach-Object {
+                $_.Update()
+                $_.Display($Detailed)
             }
         }
-    } else {
-        if ($Detailed) {
-            $script:KEYS | ForEach-Object { $_.Detailed() } | Format-Table
-        } else {
-            $script:KEYS
+    }
+
+    end {
+        if ($null -ne $originalPreference) {
+            $VerbosePreference = $originalPreference
         }
     }
 }
