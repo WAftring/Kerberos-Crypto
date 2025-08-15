@@ -61,10 +61,15 @@ class KerbRegDwordSetting {
         $this.Init($name, $defaultValue, $null)
     }
 
+    [void] Set([int]$value) {
+        $hex = "{0:X}" -f $value
+        Write-Host "Setting $($this.Name) to $hex"
+    }
+
     [pscustomobject] Display([bool]$detailed) {
         $obj = [pscustomobject]@{
-            Name         = $this.Name
-            Setting      = $this.Setting
+            Name    = $this.Name
+            Setting = $this.Setting
         }
 
         if ($detailed) {
@@ -275,7 +280,8 @@ AllowTgtSessionKey       False                               0            0     
     process {
         $selectedKeys = if ($PSCmdlet.ParameterSetName -eq "All") {
             $script:KEYS
-        } else {
+        }
+        else {
             $script:KEYS | Where-Object { $Configurations.Contains($_.Name) }
         }
 
@@ -293,6 +299,108 @@ AllowTgtSessionKey       False                               0            0     
     }
 }
 
+function Set-KerbConfig {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [ValidateSet("RC4", "DES-CRC", "DES-MD5", "AES128-SHA96", "AES256-SHA96")]
+        [string[]]$SupportedEncryptionTypes,
+        [ValidateSet(0, [int]::MaxValue)]
+        [int]$SkewTimeInMinutes,
+        [ValidateRange(0, 5)]
+        [int]$LogLevel,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxPacketSize,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$StartupTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcWaitTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcBackoffTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcSendRetries,
+        [ValidateSet("RC4", "DES-CRC", "DES-MD5", "AES128-SHA96", "AES256-SHA96")]
+        [string[]]$DefaultEncryptionType,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$FarKdcTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$NearKdcTimeoutInMinutes,
+        [bool]$StronglyEncryptDatagram,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxReferralCount,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxTokenSize,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$SpnCacheTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$S4UCacheTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$S4UTicketLifetimeInMinutes,
+        [bool]$ShouldRetryPdc,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$RequestOptions,
+        [bool]$EnableClientIpAddresses,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$TgtRenewalTimeInSeconds,
+        [bool]$AllowTgtSessionKey
+    )
+
+    $parameterMapping = @{
+        "SupportedEncryptionTypes"   = $script:KEY_SET
+        "SkewTimeInMinutes"          = $script:KEY_SKEWTIME
+        "LogLevel"                   = $script:KEY_LOGLEVEL
+        "MaxPacketSize"              = $script:KEY_MAXPACKETSIZE
+        "StartupTimeInSeconds"       = $script:KEY_STARTUPTIME
+        "KdcWaitTimeInSeconds"       = $script:KEY_KDCWAITTIME
+        "KdcBackoffTimeInSeconds"    = $script:KEY_KDCBACKOFFTIME
+        "KdcSendRetries"             = $script:KEY_KDCSENDRETRIES
+        "DefaultEncryptionType"      = $script:KEY_DEFAULTENCRYPTIONTYPE
+        "FarKdcTimeoutInMinutes"     = $script:KEY_FARKDCTIMEOUT
+        "NearKdcTimeoutInMinutes"    = $script:KEY_NEARKDCTIMEOUT
+        "StronglyEncryptDatagram"    = $script:KEY_STRONGLYENCRYPTDATAGRAM
+        "MaxReferralCount"           = $script:KEY_MAXREFERRALCOUNT
+        "MaxTokenSize"               = $script:KEY_MAXTOKENSIZE
+        "SpnCacheTimeoutInMinutes"   = $script:KEY_SPNCACHETIMEOUT
+        "S4UCacheTimeoutInMinutes"   = $script:KEY_S4UCACHETIMEOUT
+        "S4UTicketLifetimeInMinutes" = $script:KEY_S4UTICKETLIFETIME
+        "ShouldRetryPdc"             = $script:KEY_RETRYPDC
+        "RequestOptions"             = $script:KEY_REQUESTOPTIONS
+        "EnableClientIpAddresses"    = $script:KEY_CLIENTIPADDRESSES
+        "TgtRenewalTimeInSeconds"    = $script:KEY_TGTRENEWALTIME
+        "AllowTgtSessionKey"         = $script:KEY_ALLOWTGTSESSIONKEY
+    }
+
+    $etypeConversion = @("SupportedEncryptionTypes", "DefaultEncryptionType")
+    $boolConversion = @("StronglyEncryptDatagram", "ShouldRetryPdc", "AllowTgtSessionKey")
+
+    # Bool entries
+    foreach ($parameter in $parameterMapping.Keys) {
+        if ($PSBoundParameters.ContainsKey($parameter)) {
+            Write-Verbose "Found matching key $($parameter)"
+
+            if ($etypeConversion.Contains($parameter)) {
+
+                [int]$mask = 0
+                $values = $PSBoundParameters[$parameter]
+
+                $script:ETYPES | Where-Object { $values.Contains($_.Name) } | ForEach-Object {
+                    $mask = $mask -bor $_.Mask
+                }
+
+                $parameterMapping[$parameter].Set($mask)
+            }
+            elseif ($boolConversion.Contains($parameter[0])) {
+                $parameterMapping[$parameter].Set([int]$PSBoundParameters[$parameter])
+            }
+            else {
+                $parameterMapping[$parameter].Set($PSBoundParameters[$parameter])
+            }
+        }
+    }
+
+}
+
 Export-ModuleMember -Function 'Get-KerbConfig'
+Export-ModuleMember -Function 'Set-KerbConfig'
 
 #end region
