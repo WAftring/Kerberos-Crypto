@@ -63,7 +63,17 @@ class KerbRegDwordSetting {
 
     [void] Set([int]$value) {
         $hex = "{0:X}" -f $value
-        Write-Host "Setting $($this.Name) to $hex"
+        Write-Verbose "Setting $($this.Name) to $hex"
+        if (-not $(Test-Path -Path $script:KEY_PATH)) {
+            New-Item -Path $script:KEY_PATH -Force
+        }
+        Set-ItemProperty -Path $script:KEY_PATH -Name $this.Name -Value $value -Type DWord
+    }
+
+    [void] Clear() {
+        if ($null -ne $(Get-ItemProperty -Path $script:KEY_PATH -Name $this.Name -ErrorAction SilentlyContinue)) {
+            Remove-ItemProperty -Path $script:KEY_PATH -Name $this.Name
+        }
     }
 
     [pscustomobject] Display([bool]$detailed) {
@@ -178,6 +188,31 @@ $script:KEYS = (
     $script:KEY_TGTRENEWALTIME,
     $script:KEY_ALLOWTGTSESSIONKEY
 )
+
+$script:PARAMETER_MAPPING = @{
+    "SupportedEncryptionTypes"   = $script:KEY_SET
+    "SkewTimeInMinutes"          = $script:KEY_SKEWTIME
+    "LogLevel"                   = $script:KEY_LOGLEVEL
+    "MaxPacketSize"              = $script:KEY_MAXPACKETSIZE
+    "StartupTimeInSeconds"       = $script:KEY_STARTUPTIME
+    "KdcWaitTimeInSeconds"       = $script:KEY_KDCWAITTIME
+    "KdcBackoffTimeInSeconds"    = $script:KEY_KDCBACKOFFTIME
+    "KdcSendRetries"             = $script:KEY_KDCSENDRETRIES
+    "DefaultEncryptionType"      = $script:KEY_DEFAULTENCRYPTIONTYPE
+    "FarKdcTimeoutInMinutes"     = $script:KEY_FARKDCTIMEOUT
+    "NearKdcTimeoutInMinutes"    = $script:KEY_NEARKDCTIMEOUT
+    "StronglyEncryptDatagram"    = $script:KEY_STRONGLYENCRYPTDATAGRAM
+    "MaxReferralCount"           = $script:KEY_MAXREFERRALCOUNT
+    "MaxTokenSize"               = $script:KEY_MAXTOKENSIZE
+    "SpnCacheTimeoutInMinutes"   = $script:KEY_SPNCACHETIMEOUT
+    "S4UCacheTimeoutInMinutes"   = $script:KEY_S4UCACHETIMEOUT
+    "S4UTicketLifetimeInMinutes" = $script:KEY_S4UTICKETLIFETIME
+    "ShouldRetryPdc"             = $script:KEY_RETRYPDC
+    "RequestOptions"             = $script:KEY_REQUESTOPTIONS
+    "EnableClientIpAddresses"    = $script:KEY_CLIENTIPADDRESSES
+    "TgtRenewalTimeInSeconds"    = $script:KEY_TGTRENEWALTIME
+    "AllowTgtSessionKey"         = $script:KEY_ALLOWTGTSESSIONKEY
+}
 
 #endregion
 
@@ -345,36 +380,13 @@ function Set-KerbConfig {
         [bool]$AllowTgtSessionKey
     )
 
-    $parameterMapping = @{
-        "SupportedEncryptionTypes"   = $script:KEY_SET
-        "SkewTimeInMinutes"          = $script:KEY_SKEWTIME
-        "LogLevel"                   = $script:KEY_LOGLEVEL
-        "MaxPacketSize"              = $script:KEY_MAXPACKETSIZE
-        "StartupTimeInSeconds"       = $script:KEY_STARTUPTIME
-        "KdcWaitTimeInSeconds"       = $script:KEY_KDCWAITTIME
-        "KdcBackoffTimeInSeconds"    = $script:KEY_KDCBACKOFFTIME
-        "KdcSendRetries"             = $script:KEY_KDCSENDRETRIES
-        "DefaultEncryptionType"      = $script:KEY_DEFAULTENCRYPTIONTYPE
-        "FarKdcTimeoutInMinutes"     = $script:KEY_FARKDCTIMEOUT
-        "NearKdcTimeoutInMinutes"    = $script:KEY_NEARKDCTIMEOUT
-        "StronglyEncryptDatagram"    = $script:KEY_STRONGLYENCRYPTDATAGRAM
-        "MaxReferralCount"           = $script:KEY_MAXREFERRALCOUNT
-        "MaxTokenSize"               = $script:KEY_MAXTOKENSIZE
-        "SpnCacheTimeoutInMinutes"   = $script:KEY_SPNCACHETIMEOUT
-        "S4UCacheTimeoutInMinutes"   = $script:KEY_S4UCACHETIMEOUT
-        "S4UTicketLifetimeInMinutes" = $script:KEY_S4UTICKETLIFETIME
-        "ShouldRetryPdc"             = $script:KEY_RETRYPDC
-        "RequestOptions"             = $script:KEY_REQUESTOPTIONS
-        "EnableClientIpAddresses"    = $script:KEY_CLIENTIPADDRESSES
-        "TgtRenewalTimeInSeconds"    = $script:KEY_TGTRENEWALTIME
-        "AllowTgtSessionKey"         = $script:KEY_ALLOWTGTSESSIONKEY
-    }
+
 
     $etypeConversion = @("SupportedEncryptionTypes", "DefaultEncryptionType")
     $boolConversion = @("StronglyEncryptDatagram", "ShouldRetryPdc", "AllowTgtSessionKey")
 
     # Bool entries
-    foreach ($parameter in $parameterMapping.Keys) {
+    foreach ($parameter in $script:PARAMETER_MAPPING.Keys) {
         if ($PSBoundParameters.ContainsKey($parameter)) {
             Write-Verbose "Found matching key $($parameter)"
 
@@ -387,20 +399,55 @@ function Set-KerbConfig {
                     $mask = $mask -bor $_.Mask
                 }
 
-                $parameterMapping[$parameter].Set($mask)
+                $script:PARAMETER_MAPPING[$parameter].Set($mask)
             }
             elseif ($boolConversion.Contains($parameter[0])) {
-                $parameterMapping[$parameter].Set([int]$PSBoundParameters[$parameter])
+                $script:PARAMETER_MAPPING[$parameter].Set([int]$PSBoundParameters[$parameter])
             }
             else {
-                $parameterMapping[$parameter].Set($PSBoundParameters[$parameter])
+                $script:PARAMETER_MAPPING[$parameter].Set($PSBoundParameters[$parameter])
             }
         }
     }
 
 }
 
+function Clear-KerbConfig {
+    param(
+        [switch]$SupportedEncryptionTypes,
+        [switch]$SkewTimeInMinutes,
+        [switch]$LogLevel,
+        [switch]$MaxPacketSize,
+        [switch]$StartupTimeInSeconds,
+        [switch]$KdcWaitTimeInSeconds,
+        [switch]$KdcBackoffTimeInSeconds,
+        [switch]$KdcSendRetries,
+        [switch]$DefaultEncryptionType,
+        [switch]$FarKdcTimeoutInMinutes,
+        [switch]$NearKdcTimeoutInMinutes,
+        [switch]$StronglyEncryptDatagram,
+        [switch]$MaxReferralCount,
+        [switch]$MaxTokenSize,
+        [switch]$SpnCacheTimeoutInMinutes,
+        [switch]$S4UCacheTimeoutInMinutes,
+        [switch]$S4UTicketLifetimeInMinutes,
+        [switch]$ShouldRetryPdc,
+        [switch]$RequestOptions,
+        [switch]$EnableClientIpAddresses,
+        [switch]$TgtRenewalTimeInSeconds,
+        [switch]$AllowTgtSessionKey,
+        [switch]$All
+    )
+
+    foreach($parameter in $script:PARAMETER_MAPPING.Keys) {
+        if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
+            $script:PARAMETER_MAPPING[$parameter].Clear()
+        }
+    }
+}
+
 Export-ModuleMember -Function 'Get-KerbConfig'
 Export-ModuleMember -Function 'Set-KerbConfig'
+Export-ModuleMember -Function 'Clear-KerbConfig'
 
 #end region
