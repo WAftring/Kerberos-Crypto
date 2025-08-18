@@ -335,7 +335,15 @@ AllowTgtSessionKey       False                               0            0     
 }
 
 function Set-KerbConfig {
-    [CmdletBinding()]
+    <#
+.SYNOPSIS
+Set-KerbConfig adjust the configuration of a Windows Kerberos client registry based configuration
+.DESCRIPTION
+Set-KerbConfig changes the current registry value of the Windows Kerberos Client to the specified value to change the behavior of the module.
+.EXAMPLE
+Set-KerbConfig -SupportedEncryptionTypes AES128-SHA96,AES256-SHA96 -FarKdcTimeoutInMinutes 10
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param (
         [Parameter()]
         [ValidateSet("RC4", "DES-CRC", "DES-MD5", "AES128-SHA96", "AES256-SHA96")]
@@ -380,39 +388,56 @@ function Set-KerbConfig {
         [bool]$AllowTgtSessionKey
     )
 
+    if (0 -eq $($PSBoundParameters.Keys | Where-Object { $script:PARAMETER_MAPPING.Keys.Contains($_) }).Count) {
+        throw "At least one of the defined parameters must be supplied"
+    }
 
 
     $etypeConversion = @("SupportedEncryptionTypes", "DefaultEncryptionType")
     $boolConversion = @("StronglyEncryptDatagram", "ShouldRetryPdc", "AllowTgtSessionKey")
 
-    # Bool entries
     foreach ($parameter in $script:PARAMETER_MAPPING.Keys) {
         if ($PSBoundParameters.ContainsKey($parameter)) {
             Write-Verbose "Found matching key $($parameter)"
 
-            if ($etypeConversion.Contains($parameter)) {
+            $value = 0
+            if ($PSCmdlet.ShouldProcess("KerbConfig", $parameter, "Set")) {
+                if ($etypeConversion.Contains($parameter)) {
 
-                [int]$mask = 0
-                $values = $PSBoundParameters[$parameter]
+                    [int]$mask = 0
+                    $values = $PSBoundParameters[$parameter]
 
-                $script:ETYPES | Where-Object { $values.Contains($_.Name) } | ForEach-Object {
-                    $mask = $mask -bor $_.Mask
+                    $script:ETYPES | Where-Object { $values.Contains($_.Name) } | ForEach-Object {
+                        $mask = $mask -bor $_.Mask
+                    }
+
+                    $value = $mask
+                }
+                elseif ($boolConversion.Contains($parameter)) {
+                    $value = [int]$PSBoundParameters[$parameter]
+                }
+                else {
+                    $value = $PSBoundParameters[$parameter]
                 }
 
-                $script:PARAMETER_MAPPING[$parameter].Set($mask)
-            }
-            elseif ($boolConversion.Contains($parameter[0])) {
-                $script:PARAMETER_MAPPING[$parameter].Set([int]$PSBoundParameters[$parameter])
-            }
-            else {
-                $script:PARAMETER_MAPPING[$parameter].Set($PSBoundParameters[$parameter])
+                $script:PARAMETER_MAPPING[$parameter].Set($value)
+            } else {
+                Write-Verbose "Skipping the set of $($parameter)"
             }
         }
     }
-
 }
 
 function Clear-KerbConfig {
+<#
+.SYNOPSIS
+Clear-KerbConfig clears the selected Microsoft Windows Kerberos configuration value.
+.DESCRIPTION
+Clear-KerbConfig clears the backing registry value for the selected configuration.
+.EXAMPLE
+Clear-KerbConfig -SupportedEncryptionTypes
+#>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
     param(
         [switch]$SupportedEncryptionTypes,
         [switch]$SkewTimeInMinutes,
@@ -439,11 +464,29 @@ function Clear-KerbConfig {
         [switch]$All
     )
 
-    foreach($parameter in $script:PARAMETER_MAPPING.Keys) {
-        if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
-            $script:PARAMETER_MAPPING[$parameter].Clear()
+    begin {
+        $oldImpact = $ConfirmPreference
+        if ($All) {
+            $ConfirmPreference = 'High'
         }
     }
+
+    process {
+        foreach($parameter in $script:PARAMETER_MAPPING.Keys) {
+                if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
+                    if ($PSCmdlet.ShouldProcess('KerbConfig', $parameter, 'Clear')) {
+                        $script:PARAMETER_MAPPING[$parameter].Clear()
+                    }
+                }
+            }
+    }
+
+    end {
+        if ($oldImpact -ne $ConfirmPreference) {
+            $ConfirmPreference = $oldImpact
+        }
+    }
+
 }
 
 Export-ModuleMember -Function 'Get-KerbConfig'
