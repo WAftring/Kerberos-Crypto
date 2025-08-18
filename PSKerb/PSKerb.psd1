@@ -12,7 +12,7 @@
 RootModule = '.\PSKerb.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.0.3'
+ModuleVersion = '0.0.4'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -69,7 +69,7 @@ PowerShellVersion = '5.1'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @( 'Get-KerbConfig' )
+FunctionsToExport = @( 'Get-KerbConfig', 'Set-KerbConfig', 'Clear-KerbConfig' )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 #CmdletsToExport = @()
@@ -107,10 +107,10 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        # ReleaseNotes = ''
+        ReleaseNotes = 'Include adjustment of KerbConfig'
 
         # Prerelease string of this module
-        # Prerelease = ''
+        Prerelease = '-beta'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
