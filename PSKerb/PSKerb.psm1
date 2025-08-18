@@ -401,7 +401,7 @@ Set-KerbConfig -SupportedEncryptionTypes AES128-SHA96,AES256-SHA96 -FarKdcTimeou
             Write-Verbose "Found matching key $($parameter)"
 
             $value = 0
-            if ($PSCmdlet.ShouldProcess("KerbConfig", $parameter, "Set")) {
+            if ($PSCmdlet.ShouldProcess("KerbConfig $parameter set with value $($PSBoundParameters[$parameter])")) {
                 if ($etypeConversion.Contains($parameter)) {
 
                     [int]$mask = 0
@@ -422,7 +422,7 @@ Set-KerbConfig -SupportedEncryptionTypes AES128-SHA96,AES256-SHA96 -FarKdcTimeou
 
                 $script:PARAMETER_MAPPING[$parameter].Set($value)
             } else {
-                Write-Verbose "Skipping the set of $($parameter)"
+                Write-Verbose "Skipping the set of $parameter"
             }
         }
     }
@@ -473,12 +473,15 @@ Clear-KerbConfig -SupportedEncryptionTypes
 
     process {
         foreach($parameter in $script:PARAMETER_MAPPING.Keys) {
-                if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
-                    if ($PSCmdlet.ShouldProcess('KerbConfig', $parameter, 'Clear')) {
-                        $script:PARAMETER_MAPPING[$parameter].Clear()
-                    }
+            if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
+                Write-Verbose "Clearing configuration for $parameter"
+                if ($PSCmdlet.ShouldProcess("KerbConfig '$parameter'")) {
+                    $script:PARAMETER_MAPPING[$parameter].Clear()
+                } else {
+                    Write-Verbose "Skipping clearing $parameter"
                 }
             }
+        }
     }
 
     end {
