@@ -465,6 +465,10 @@ Clear-KerbConfig -SupportedEncryptionTypes
     )
 
     begin {
+        if (0 -eq $PSBoundParameters.Count) {
+            throw "At least one of the defined parameters must be supplied"
+        }
+
         $oldImpact = $ConfirmPreference
         if ($All) {
             $ConfirmPreference = 'High'
