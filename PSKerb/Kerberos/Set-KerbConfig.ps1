@@ -71,7 +71,7 @@ Set-KerbConfig -SupportedEncryptionTypes AES128-SHA96,AES256-SHA96 -FarKdcTimeou
                     [int]$mask = 0
                     $values = $PSBoundParameters[$parameter]
 
-                    $local:ETYPES | Where-Object { $values.Contains($_.Name) } | ForEach-Object {
+                    $script:ETYPES| Where-Object { $values.Contains($_.Name) } | ForEach-Object {
                         $mask = $mask -bor $_.Mask
                     }
 
