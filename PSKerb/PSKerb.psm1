@@ -61,10 +61,25 @@ class KerbRegDwordSetting {
         $this.Init($name, $defaultValue, $null)
     }
 
+    [void] Set([int]$value) {
+        $hex = "{0:X}" -f $value
+        Write-Verbose "Setting $($this.Name) to $hex"
+        if (-not $(Test-Path -Path $script:KEY_PATH)) {
+            New-Item -Path $script:KEY_PATH -Force
+        }
+        Set-ItemProperty -Path $script:KEY_PATH -Name $this.Name -Value $value -Type DWord
+    }
+
+    [void] Clear() {
+        if ($null -ne $(Get-ItemProperty -Path $script:KEY_PATH -Name $this.Name -ErrorAction SilentlyContinue)) {
+            Remove-ItemProperty -Path $script:KEY_PATH -Name $this.Name
+        }
+    }
+
     [pscustomobject] Display([bool]$detailed) {
         $obj = [pscustomobject]@{
-            Name         = $this.Name
-            Setting      = $this.Setting
+            Name    = $this.Name
+            Setting = $this.Setting
         }
 
         if ($detailed) {
@@ -174,6 +189,31 @@ $script:KEYS = (
     $script:KEY_ALLOWTGTSESSIONKEY
 )
 
+$script:PARAMETER_MAPPING = @{
+    "SupportedEncryptionTypes"   = $script:KEY_SET
+    "SkewTimeInMinutes"          = $script:KEY_SKEWTIME
+    "LogLevel"                   = $script:KEY_LOGLEVEL
+    "MaxPacketSize"              = $script:KEY_MAXPACKETSIZE
+    "StartupTimeInSeconds"       = $script:KEY_STARTUPTIME
+    "KdcWaitTimeInSeconds"       = $script:KEY_KDCWAITTIME
+    "KdcBackoffTimeInSeconds"    = $script:KEY_KDCBACKOFFTIME
+    "KdcSendRetries"             = $script:KEY_KDCSENDRETRIES
+    "DefaultEncryptionType"      = $script:KEY_DEFAULTENCRYPTIONTYPE
+    "FarKdcTimeoutInMinutes"     = $script:KEY_FARKDCTIMEOUT
+    "NearKdcTimeoutInMinutes"    = $script:KEY_NEARKDCTIMEOUT
+    "StronglyEncryptDatagram"    = $script:KEY_STRONGLYENCRYPTDATAGRAM
+    "MaxReferralCount"           = $script:KEY_MAXREFERRALCOUNT
+    "MaxTokenSize"               = $script:KEY_MAXTOKENSIZE
+    "SpnCacheTimeoutInMinutes"   = $script:KEY_SPNCACHETIMEOUT
+    "S4UCacheTimeoutInMinutes"   = $script:KEY_S4UCACHETIMEOUT
+    "S4UTicketLifetimeInMinutes" = $script:KEY_S4UTICKETLIFETIME
+    "ShouldRetryPdc"             = $script:KEY_RETRYPDC
+    "RequestOptions"             = $script:KEY_REQUESTOPTIONS
+    "EnableClientIpAddresses"    = $script:KEY_CLIENTIPADDRESSES
+    "TgtRenewalTimeInSeconds"    = $script:KEY_TGTRENEWALTIME
+    "AllowTgtSessionKey"         = $script:KEY_ALLOWTGTSESSIONKEY
+}
+
 #endregion
 
 
@@ -275,7 +315,8 @@ AllowTgtSessionKey       False                               0            0     
     process {
         $selectedKeys = if ($PSCmdlet.ParameterSetName -eq "All") {
             $script:KEYS
-        } else {
+        }
+        else {
             $script:KEYS | Where-Object { $Configurations.Contains($_.Name) }
         }
 
@@ -293,6 +334,170 @@ AllowTgtSessionKey       False                               0            0     
     }
 }
 
+function Set-KerbConfig {
+    <#
+.SYNOPSIS
+Set-KerbConfig adjust the configuration of a Windows Kerberos client registry based configuration
+.DESCRIPTION
+Set-KerbConfig changes the current registry value of the Windows Kerberos Client to the specified value to change the behavior of the module.
+.EXAMPLE
+Set-KerbConfig -SupportedEncryptionTypes AES128-SHA96,AES256-SHA96 -FarKdcTimeoutInMinutes 10
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param (
+        [Parameter()]
+        [ValidateSet("RC4", "DES-CRC", "DES-MD5", "AES128-SHA96", "AES256-SHA96")]
+        [string[]]$SupportedEncryptionTypes,
+        [ValidateSet(0, [int]::MaxValue)]
+        [int]$SkewTimeInMinutes,
+        [ValidateRange(0, 5)]
+        [int]$LogLevel,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxPacketSize,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$StartupTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcWaitTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcBackoffTimeInSeconds,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$KdcSendRetries,
+        [ValidateSet("RC4", "DES-CRC", "DES-MD5", "AES128-SHA96", "AES256-SHA96")]
+        [string[]]$DefaultEncryptionType,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$FarKdcTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$NearKdcTimeoutInMinutes,
+        [bool]$StronglyEncryptDatagram,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxReferralCount,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$MaxTokenSize,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$SpnCacheTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$S4UCacheTimeoutInMinutes,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$S4UTicketLifetimeInMinutes,
+        [bool]$ShouldRetryPdc,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$RequestOptions,
+        [bool]$EnableClientIpAddresses,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$TgtRenewalTimeInSeconds,
+        [bool]$AllowTgtSessionKey
+    )
+
+    if (0 -eq $($PSBoundParameters.Keys | Where-Object { $script:PARAMETER_MAPPING.Keys.Contains($_) }).Count) {
+        throw "At least one of the defined parameters must be supplied"
+    }
+
+
+    $etypeConversion = @("SupportedEncryptionTypes", "DefaultEncryptionType")
+    $boolConversion = @("StronglyEncryptDatagram", "ShouldRetryPdc", "AllowTgtSessionKey")
+
+    foreach ($parameter in $script:PARAMETER_MAPPING.Keys) {
+        if ($PSBoundParameters.ContainsKey($parameter)) {
+            Write-Verbose "Found matching key $($parameter)"
+
+            $value = 0
+            if ($PSCmdlet.ShouldProcess("KerbConfig $parameter set with value $($PSBoundParameters[$parameter])")) {
+                if ($etypeConversion.Contains($parameter)) {
+
+                    [int]$mask = 0
+                    $values = $PSBoundParameters[$parameter]
+
+                    $script:ETYPES | Where-Object { $values.Contains($_.Name) } | ForEach-Object {
+                        $mask = $mask -bor $_.Mask
+                    }
+
+                    $value = $mask
+                }
+                elseif ($boolConversion.Contains($parameter)) {
+                    $value = [int]$PSBoundParameters[$parameter]
+                }
+                else {
+                    $value = $PSBoundParameters[$parameter]
+                }
+
+                $script:PARAMETER_MAPPING[$parameter].Set($value)
+            } else {
+                Write-Verbose "Skipping the set of $parameter"
+            }
+        }
+    }
+}
+
+function Clear-KerbConfig {
+<#
+.SYNOPSIS
+Clear-KerbConfig clears the selected Microsoft Windows Kerberos configuration value.
+.DESCRIPTION
+Clear-KerbConfig clears the backing registry value for the selected configuration.
+.EXAMPLE
+Clear-KerbConfig -SupportedEncryptionTypes
+#>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
+    param(
+        [switch]$SupportedEncryptionTypes,
+        [switch]$SkewTimeInMinutes,
+        [switch]$LogLevel,
+        [switch]$MaxPacketSize,
+        [switch]$StartupTimeInSeconds,
+        [switch]$KdcWaitTimeInSeconds,
+        [switch]$KdcBackoffTimeInSeconds,
+        [switch]$KdcSendRetries,
+        [switch]$DefaultEncryptionType,
+        [switch]$FarKdcTimeoutInMinutes,
+        [switch]$NearKdcTimeoutInMinutes,
+        [switch]$StronglyEncryptDatagram,
+        [switch]$MaxReferralCount,
+        [switch]$MaxTokenSize,
+        [switch]$SpnCacheTimeoutInMinutes,
+        [switch]$S4UCacheTimeoutInMinutes,
+        [switch]$S4UTicketLifetimeInMinutes,
+        [switch]$ShouldRetryPdc,
+        [switch]$RequestOptions,
+        [switch]$EnableClientIpAddresses,
+        [switch]$TgtRenewalTimeInSeconds,
+        [switch]$AllowTgtSessionKey,
+        [switch]$All
+    )
+
+    begin {
+        if (0 -eq $PSBoundParameters.Count) {
+            throw "At least one of the defined parameters must be supplied"
+        }
+
+        $oldImpact = $ConfirmPreference
+        if ($All) {
+            $ConfirmPreference = 'High'
+        }
+    }
+
+    process {
+        foreach($parameter in $script:PARAMETER_MAPPING.Keys) {
+            if ($All -or $PSBoundParameters.ContainsKey($parameter)) {
+                Write-Verbose "Clearing configuration for $parameter"
+                if ($PSCmdlet.ShouldProcess("KerbConfig '$parameter'")) {
+                    $script:PARAMETER_MAPPING[$parameter].Clear()
+                } else {
+                    Write-Verbose "Skipping clearing $parameter"
+                }
+            }
+        }
+    }
+
+    end {
+        if ($oldImpact -ne $ConfirmPreference) {
+            $ConfirmPreference = $oldImpact
+        }
+    }
+
+}
+
 Export-ModuleMember -Function 'Get-KerbConfig'
+Export-ModuleMember -Function 'Set-KerbConfig'
+Export-ModuleMember -Function 'Clear-KerbConfig'
 
 #end region
