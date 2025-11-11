@@ -206,7 +206,10 @@ if ("AllKdcs" -eq $SearchScope) {
         $KDCName = $_.HostName
         try {
             [Array]$r = $(Get-KdcEventLog -KDCName $KDCName -Query $script:XPathQuery)
-            $Events.AddRange($r)
+
+            if ($null -ne $r -and 0 -ne $r.Count) {
+                $Events.AddRange($r)
+            }
         }
         catch {
             Write-Error "Failed to get event logs from $KDCName with result: $_"
@@ -214,8 +217,15 @@ if ("AllKdcs" -eq $SearchScope) {
     }
 }
 else {
-    [Array]$r = $(Get-KdcEventLog -Query $script:XPathQuery)
-    $Events.AddRange($r)
+    try {
+        [Array]$r = $(Get-KdcEventLog -Query $script:XPathQuery)
+
+        if ($null -ne $r -and 0 -ne $r.Count) {
+            $Events.AddRange($r)
+        }
+    } catch {
+        Write-Error "Failed to get event logs from $KDCName with result: $_"
+    }
 }
 
 # Validate we are working with the correct version
