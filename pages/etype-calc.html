@@ -35,19 +35,16 @@
         .form-field label {
             display: inline-block;
             width: 175px;
-            /* Adjust this for desired alignment */
             text-align: right;
             margin-right: 10px;
         }
 
-        /* Radio button alignment */
         .radio-group label {
             display: inline-block;
             margin-right: 20px;
             vertical-align: middle;
         }
 
-        /* Style for the result section */
         .result {
             margin-top: 20px;
             padding: 10px;
@@ -62,7 +59,6 @@
         .result-field label {
             display: inline-block;
             width: 150px;
-            /* Same as input labels for alignment */
             text-align: right;
             margin-right: 10px;
         }
@@ -73,24 +69,21 @@
         }
     </style>
     <script>
+
         const AES_SHA2_BITS = 0xc0;
-        const DOMAIN_SET = 0x1c;
         const AES_SHA1_BITS = 0x18;
         const KRBTGT_SET = AES_SHA1_BITS;
         const AES_SK_BITS = 0x20;
+
         const ETYPE_MAP = new Map()
             // .set(0x80, "AES256-SHA2")
             // .set(0x40, "AES128-SHA2")
             .set(0x10, "AES256-SHA1")
             .set(0x08, "AES128-SHA1")
             .set(0x04, "RC4")
-            .set(0x02, "DES-MD5")
-            .set(0x01, "DES-CRC")
             .set(0x00, "NONE");
 
         const CHECKBOX_VALUES = [
-            BigInt(0x1),
-            BigInt(0x2),
             BigInt(0x4),
             BigInt(0x8),
             BigInt(0x10),
@@ -304,12 +297,9 @@
                 <tr>
                     <th>Configuration Location</th>
                     <th>msds-SET</th>
-                    <th>DES-CRC</th>
-                    <th>DES-MD5</th>
                     <th>RC4</th>
                     <th>AES128-SHA1</th>
                     <th>AES256-SHA1</th>
-                    <th>Future ETypes</th>
                 </tr>
                 <tr id="clientRow">
                     <td>
@@ -318,9 +308,6 @@
                     <td>
                         <input type="text" class="setValue" onchange="maskToCheckboxes(this)" value="0x1c">
                     </td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
@@ -335,9 +322,6 @@
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                 </tr>
                 <tr id="serverRow">
                     <td>
@@ -349,20 +333,14 @@
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                 </tr>
                 <tr id="domainRow">
                     <td>
                         <label>Default Domain ETypes</label>
                     </td>
                     <td>
-                        <input type="text" class="setValue" onchange="maskToCheckboxes(this)" value="0x27">
+                        <input type="text" class="setValue" onchange="maskToCheckboxes(this)" value="0x24">
                     </td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
-                    <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
                     <td><input class="etype" onclick="checkboxesToValue(this)" type="checkbox"></td>
@@ -371,7 +349,6 @@
         </div>
     </div>
 
-    <!-- Radio Buttons for selecting the key type -->
     <div class="radio-group">
         <label for="krbtgt">
             <input type="radio" id="krbtgt" name="keyType" value="krbtgt" onclick="radioChanged('kdc')"> Krbtgt
@@ -385,12 +362,10 @@
         </label>
     </div>
 
-    <!-- Calculate Button -->
     <div>
         <button type="button" onclick="calculate()">Calculate</button>
     </div>
 
-    <!-- Result Section with aligned output -->
     <div class="result" id="result">
         <div class="result-field">
             <label>Target:</label>
@@ -419,18 +394,21 @@
                     href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ada2/a75d1c3f-0bb3-470c-99bd-2bb557119483">msds-SupportedEncryptionTypes</a>
                 the etypes that are supported by the account.</li>
             <li>Default Domain ETypes: <a
-                    href="https://support.microsoft.com/en-us/topic/kb5021131-how-to-manage-the-kerberos-protocol-changes-related-to-cve-2022-37966-fd837ac3-cdec-4e76-a6ec-86e67501407d#:~:text=the%20Kerberos%20protocol%3A-,DefaultDomainSupportedEncTypes,-Registry%20key">DefaultDomainSupportedEnc</a>
-                the assumed supported encryption types for the domain if no msds-SET is defined for the account.</li>
+                    href="https://support.microsoft.com/en-us/topic/kb5021131-how-to-manage-the-kerberos-protocol-changes-related-to-cve-2022-37966-fd837ac3-cdec-4e76-a6ec-86e67501407d#:~:text=the%20Kerberos%20protocol%3A-,DefaultDomainSupportedEncTypes,-Registry%20key">DefaultDomainSupportedEncTypes</a>
+                the assumed supported encryption types for the domain if no msds-SET is defined for the account.
+                <ul>
+                    <li><b>IMPORTANT:</b> The DefaultDomainSupportedEncTypes (DDSET) is subject to the KDCs supported encryption types configuration. For example, if the KDC does not support RC4, RC4 will not be used, regardless of the configuration of the DDSET,</li>
+                </ul>
+            </li>
             <li>KDC: <a href="https://learn.microsoft.com/en-us/windows/win32/secauthn/key-distribution-center">Key
                     Distribution Center</a></li>
             <li>Subsession Key: The key that can be negotiated after the initial session is setup between client and server.</li>
-            <li>Future ETypes: This configuration is used to enable future etypes by default when they are released.</li>
         </ul>
         <h3>Caveats</h3>
         <p>This calculator operates with a few assumptions.
         <ul>
-            <li>You are working with Windows Server 2025 / Windows 11 24H2 or newer</li>
-            <li>The msds-SET is accurately reflecting what the accounts are capable of</li>
+            <li>You are working with Windows Server 2025 / Windows 11 24H2 or newer.</li>
+            <li>The msds-SET is accurately reflecting the etypes that the machines are capable of leveraging.</li>
         </ul>
         </p>
         <h3>Additional Reading:</h3>

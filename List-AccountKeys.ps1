@@ -201,14 +201,20 @@ if ("None" -ne $NotContainsKeyType) {
 $accounts = [System.Collections.ArrayList]::new()
 if ("This" -eq $SearchScope) {
     [Array]$r = $(Get-AccountsFromKDC -Query $script:XPathQuery)
-    $accounts.AddRange($r)
+
+    if ($null -ne $r -and 0 -ne $r.Count) {
+        $accounts.AddRange($r)
+    }
 }
 else {
     Get-ADDomainController -Service KDC -Discover | ForEach-Object {
         $KDCName = $_.HostName
         try {
             [Array]$r = $(Get-AccountsFromKDC -KDCName $KDCName -Query $script:XPathQuery)
-            $accounts.AddRange($r)
+
+            if ($null -ne $r -and 0 -ne $r.Count) {
+                $accounts.AddRange($r)
+            }
         }
         catch {
             Write-Error "Failed to get event logs from $KDCName with result: $_"
