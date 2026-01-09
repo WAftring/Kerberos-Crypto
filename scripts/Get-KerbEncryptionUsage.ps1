@@ -104,24 +104,18 @@ $script:AES128 = [EncryptionType]::new("AES128-SHA96", 0x11)
 $script:AES256 = [EncryptionType]::new("AES256-SHA96", 0x12)
 $script:AES128_SHA256 = [EncryptionType]::new("AES128-SHA256", 0x13)
 $script:AES256_SHA384 = [EncryptionType]::new("AES256-SHA384", 0x14)
+$script:UnknownEType = [EncryptionType]::new("Unknown", 0xFF)
 
-$script:EncryptionNameTypeMap = @{}
-$script:EncryptionNameTypeMap.Add($script:DES_CRC.Name, $script:DES_CRC)
-$script:EncryptionNameTypeMap.Add($script:DES_MD5.Name, $script:DES_MD5)
-$script:EncryptionNameTypeMap.Add($script:RC4.Name, $script:RC4)
-$script:EncryptionNameTypeMap.Add($script:AES128.Name, $script:AES128)
-$script:EncryptionNameTypeMap.Add($script:AES256.Name, $script:AES256)
-$script:EncryptionNameTypeMap.Add($script:AES128_SHA256.Name, $script:AES128_SHA256)
-$script:EncryptionNameTypeMap.Add($script:AES256_SHA384.Name, $script:AES256_SHA384)
-
-$script:EncryptionValueTypeMap = @{}
-$script:EncryptionValueTypeMap.Add($script:DES_CRC.Value, $script:DES_CRC)
-$script:EncryptionValueTypeMap.Add($script:DES_MD5.Value, $script:DES_MD5)
-$script:EncryptionValueTypeMap.Add($script:RC4.Value, $script:RC4)
-$script:EncryptionValueTypeMap.Add($script:AES128.Value, $script:AES128)
-$script:EncryptionValueTypeMap.Add($script:AES256.Value, $script:AES256)
-$script:EncryptionValueTypeMap.Add($script:AES128_SHA256.Value, $script:AES128_SHA256)
-$script:EncryptionValueTypeMap.Add($script:AES256_SHA384.Value, $script:AES256_SHA384)
+$script:EncryptionTypes = @(
+    $script:DES_CRC
+    $script:DES_MD5
+    $script:RC4
+    $script:AES128
+    $script:AES256
+    $script:AES128_SHA256
+    $script:AES256_SHA384
+    $script:UnknownEType
+)
 
 <#
     The new properties counts are 21 for 4769 and 24 for 4668. Meaning if we have a lower
@@ -170,6 +164,8 @@ function Get-KdcEventLog {
             throw $_
         }
     }
+
+    Write-Debug "$Results"
     return $Results
 }
 
@@ -195,90 +191,129 @@ function Check-ETypeUsage {
     }
 }
 
-#endregion
+function Get-EncryptionType {
+    param(
+        [Parameter(Mandatory = $true, ParameterSetName = "Name")]
+        [string]$Name,
+        [Parameter(Mandatory = $true, ParameterSetName = "Value")]
+        [int]$Value
+    )
 
-#region Main
+    foreach($etype in $script:EncryptionTypes) {
+        if (($PSCmdlet.ParameterSetName -eq "Name" -and $etype.Name -eq $Name) `
+            -or ($PSCmdlet.ParameterSetName -eq "Value" -and $etype.Value -eq $Value)) {
+            return $etype
+        }
+    }
 
-$Events = [System.Collections.ArrayList]::new()
-if ("AllKdcs" -eq $SearchScope) {
+    return $script:UnknownEType
+}
 
-    Get-ADDomainController -Service KDC -Discover | ForEach-Object {
-        $KDCName = $_.HostName
+function Get-EncryptionTypes {
+    return $script:EncryptionTypes
+}
+
+
+function Get-KerbEncryptionUsage {
+    [CmdletBinding()]
+    param(
+        [ValidateSet("RC4", "DES", "AES-SHA1", "AES128-SHA96", "AES256-SHA96", "All")]
+        [string]$Encryption = "All",
+        [DateTime]$Since = $(Get-Date).AddDays(-30),
+        [ValidateSet("This", "AllKdcs")]
+        [string]$SearchScope = "This",
+        [ValidateSet("Ticket", "SessionKey", "Either", "Both")]
+        [string]$EncryptionUsage = "Either"
+    )
+
+
+    $Events = [System.Collections.ArrayList]::new()
+    if ("AllKdcs" -eq $SearchScope) {
+
+        Get-ADDomainController -Service KDC -Discover | ForEach-Object {
+            $KDCName = $_.HostName
+            try {
+                [Array]$KdcResult = $(Get-KdcEventLog -KDCName $KDCName -Query $script:XPathQuery)
+
+                if ($null -ne $KdcResult -and 0 -ne $KdcResult.Count) {
+                    $Events.AddRange($KdcResult)
+                }
+            }
+            catch {
+                Write-Error "Failed to get event logs from $KDCName with result: $_"
+            }
+        }
+    }
+    else {
         try {
-            [Array]$r = $(Get-KdcEventLog -KDCName $KDCName -Query $script:XPathQuery)
+            [Array]$LocalResult = $(Get-KdcEventLog -Query $script:XPathQuery)
 
-            if ($null -ne $r -and 0 -ne $r.Count) {
-                $Events.AddRange($r)
+            if ($null -ne $LocalResult -and 0 -ne $LocalResult.Count) {
+                $Events.AddRange($LocalResult)
             }
         }
         catch {
             Write-Error "Failed to get event logs from $KDCName with result: $_"
         }
     }
-}
-else {
-    try {
-        [Array]$r = $(Get-KdcEventLog -Query $script:XPathQuery)
 
-        if ($null -ne $r -and 0 -ne $r.Count) {
-            $Events.AddRange($r)
-        }
-    } catch {
-        Write-Error "Failed to get event logs from $KDCName with result: $_"
-    }
-}
-
-# Validate we are working with the correct version
-if ($accounts.Count -gt 0 -and $accounts[0].Properties.Count -lt $script:MIN_PROPERTY_COUNT) {
-    Write-Error "Attempting to run script on Windows Version $([System.Environment]::OSVersion.Version) which doesn't have the new event metadata.
+    # Validate we are working with the correct version
+    if ($accounts.Count -gt 0 -and $accounts[0].Properties.Count -lt $script:MIN_PROPERTY_COUNT) {
+        Write-Error "Attempting to run script on Windows Version $([System.Environment]::OSVersion.Version) which doesn't have the new event metadata.
 Please install the most recent Windows Updates available for this machine and attempt again."
-    return
+        return
+    }
+
+
+    Write-Verbose "Total events: $($Events.Count)"
+    $Events | ForEach-Object {
+        $ShowRequest = $true
+        $T = $null
+        $SK = $null
+        $R = $null
+        $Target = $null
+        $IP = $null
+
+        if ($_.Id -eq 4769) {
+            $Target = $_.Properties[2].Value
+            $T = Get-EncryptionType -Value $_.Properties[5].Value
+            $SK = Get-EncryptionType -Value $_.Properties[20].Value
+            $R = [RequestType]::TGS
+            $IP = $_.Properties[6].Value
+        }
+        else {
+            $Target = $_.Properties[3].Value
+            $T = Get-EncryptionType -Value $_.Properties[7].Value
+            $SK = Get-EncryptionType -Value $_.Properties[22].Value
+            $R = [RequestType]::AS
+            $IP = $_.Properties[9].Value
+        }
+
+        if ("DES" -eq $Encryption) {
+            $D1 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:DES_CRC
+            $D2 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:DES_MD5
+            $ShowRequest = $D1 -or $D2
+        }
+        elseif ("AES-SHA1" -eq $Encryption) {
+            $A1 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:AES128
+            $A2 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:AES256
+            $ShowRequest = $A1 -or $A2
+        }
+        elseif ("All" -ne $Encryption) {
+            $Etype = Get-EncryptionType -Name $Encryption
+            $ShowRequest = $(Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $EType)
+        }
+
+        if ($ShowRequest) {
+            [KerbRequest]::new($_.TimeCreated, $IP, $_.Properties[0].Value, $Target, $R, $T, $SK)
+        }
+    }
 }
 
+#endregion
 
-Write-Verbose "Total events: $($Events.Count)"
-$Events | ForEach-Object {
-    $ShowRequest = $true
-    $T = $null
-    $SK = $null
-    $R = $null
-    $Target = $null
-    $IP = $null
-
-    if ($_.Id -eq 4769) {
-        $Target = $_.Properties[2].Value
-        $T = $script:EncryptionValueTypeMap[$_.Properties[5].Value]
-        $SK = $script:EncryptionValueTypeMap[$_.Properties[20].Value]
-        $R = [RequestType]::TGS
-        $IP = $_.Properties[6].Value
-
-    }
-    else {
-        $Target = $_.Properties[3].Value
-        $T = $script:EncryptionValueTypeMap[$_.Properties[7].Value]
-        $SK = $script:EncryptionValueTypeMap[$_.Properties[22].Value]
-        $R = [RequestType]::AS
-        $IP = $_.Properties[9].Value
-    }
-
-    if ("DES" -eq $Encryption) {
-        $D1 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:DES_CRC
-        $D2 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:DES_MD5
-        $ShowRequest = $D1 -or $D2
-    }
-    elseif("AES-SHA1" -eq $Encryption) {
-        $A1 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:AES128
-        $A2 = Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $script:AES256
-        $ShowRequest = $A1 -or $A2
-    }
-    elseif ("All" -ne $Encryption) {
-        $Etype = $script:EncryptionNameTypeMap[$Encryption]
-        $ShowRequest = $(Check-ETypeUsage -UsageMode $EncryptionUsage -TicketEtype $T -SKEtype $SK -SearchEtype $EType)
-    }
-
-    if ($ShowRequest) {
-        [KerbRequest]::new($_.TimeCreated, $IP, $_.Properties[0].Value, $Target, $R, $T, $SK)
-    }
+if ($MyInvocation.InvocationName -ne ".") {
+    Get-KerbEncryptionUsage @PSBoundParameters
 }
 
 #endregion
