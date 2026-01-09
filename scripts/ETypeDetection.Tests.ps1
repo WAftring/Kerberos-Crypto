@@ -232,6 +232,7 @@ Describe 'Get-KerbEncryptionUsage.ps1' {
         }
 
         $result = Get-KerbEncryptionUsage -SearchScope AllKdcs
+        $script:count | Should -Be 3
         $result.Count | Should -Be 2
     }
 
@@ -298,17 +299,18 @@ Describe 'List-AccountKeys.ps1' {
         $script:count = 0
 
         Mock Get-WinEvent {
+            $script:count += 1
             if ($script:count -eq 2) {
                 return $script:4769_NEW_FORMAT
             }
             else {
                 return $script:AES_4769_EVENT, $script:RC4_4769_EVENT
             }
-            $script:count += 1
         }
 
         $results = List-AccountKeys -SearchScope AllKdcs -Verbose -Debug
-        Write-Host $results
-        $results.Count | Should -Be 3
+
+        $script:count | Should -Be 3
+        $results.Count | Should -Be 5
     }
 }

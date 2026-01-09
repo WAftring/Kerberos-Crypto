@@ -249,6 +249,7 @@ function List-AccountKeys {
     else {
         Get-ADDomainController -Service KDC -Discover | ForEach-Object {
             $KDCName = $_.HostName
+
             try {
                 [Array]$KdcResult = $(Get-AccountsFromKDC -KDCName $KDCName -Query $script:XPathQuery)
 
@@ -272,6 +273,7 @@ Please install the most recent Windows Updates available for this machine and at
     $originalLimit = $FormatEnumerationLimit
     $FormatEnumerationLimit = -1
     Write-Verbose "Accounts returned: $($accounts.Count)"
+
     $accounts | ForEach-Object {
         [string]$keys = $_.Properties[16].Value
         if (-not [string]::IsNullOrEmpty($script:NotKeyFilter)) {
