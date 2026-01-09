@@ -168,11 +168,6 @@ BeforeAll {
 Describe 'Get-KerbEncryptionUsage.ps1' {
 
     BeforeAll {
-
-        Mock Get-WinEvent {
-            throw "This top level mock should never be hit and be overriden by It functions"
-        }
-
         . $PSScriptRoot\Get-KerbEncryptionUsage.ps1
     }
 
@@ -271,9 +266,6 @@ Describe 'Get-KerbEncryptionUsage.ps1' {
 
 Describe 'List-AccountKeys.ps1' {
     BeforeAll {
-        Mock Get-WinEvent {
-            throw "This top level mock should never be hit and be overriden by It functions"
-        }
         . $PSScriptRoot\List-AccountKeys.ps1
     }
 
