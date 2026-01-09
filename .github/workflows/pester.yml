@@ -1,0 +1,14 @@
+name: Run Pester Tests
+on: push
+
+jobs:
+  pester-test:
+    name: Pester test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Perform a Pester test from the ETypeDetection.Tests.ps1
+        shell: pwsh
+        run: |
+          Invoke-Pester ./scripts/ETypeDetection.Tests.ps1 -Output Detailed -Passthru
