@@ -67,8 +67,8 @@ class Account {
 
         $ckeys.Split(",").Trim() | ForEach-Object {
             if ($_ -eq $script:AES_SHA1_FILTER_2022) {
-                $tmp.Add($script:AES128)
-                $tmp.Add($script:AES256)
+                $tmp.Add("AES128-SHA96")
+                $tmp.Add("AES256-SHA96")
             }
             else  {
                 $tmp.Add($_)

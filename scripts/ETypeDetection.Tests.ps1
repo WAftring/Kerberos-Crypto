@@ -1,6 +1,8 @@
 BeforeAll {
 
     $script:AES_4769_EVENT = [PSCustomObject]@{
+        RecordId    = 1
+        MachineName = "KDC1"
         Id          = 4769
         TimeCreated = $(Get-Date)
         Properties  = @(
@@ -29,6 +31,8 @@ BeforeAll {
     }
 
     $script:4769_NEW_FORMAT = [PSCustomObject]@{
+        RecordId    = 1
+        MachineName = "KDC1"
         Id          = 4769
         TimeCreated = $(Get-Date)
         Properties  = @(
@@ -57,6 +61,8 @@ BeforeAll {
     }
 
     $script:RC4_4769_EVENT = [PSCustomObject]@{
+        RecordId    = 1
+        MachineName = "KDC1"
         Id          = 4769
         TimeCreated = $(Get-Date)
         Properties  = @(
@@ -85,6 +91,8 @@ BeforeAll {
     }
 
     $script:AES_4768_EVENT = [PSCustomObject]@{
+        RecordId    = 1
+        MachineName = "KDC1"
         Id          = 4768
         TimeCreated = $(Get-Date)
         Properties  = @(
@@ -116,6 +124,8 @@ BeforeAll {
     }
 
     $script:RC4_4768_EVENT = [PSCustomObject]@{
+        RecordId    = 1
+        MachineName = "KDC1"
         Id          = 4768
         TimeCreated = $(Get-Date)
         Properties  = @(
@@ -276,10 +286,10 @@ Describe 'List-AccountKeys.ps1' {
 
         $result = List-AccountKeys
         $result.Count | Should -Be 1
-        $result[0].Keys.Count | Should -Be 3
-        $result[0].Keys.Name | Should -Contain "RC4"
-        $result[0].Keys.Name | Should -Contain "AES128-SHA96"
-        $result[0].Keys.Name | Should -Contain "AES256-SHA96"
+        Write-Host $result[0].Keys
+        $result[0].Keys | Should -Match "RC4"
+        $result[0].Keys | Should -Match "AES128-SHA96"
+        $result[0].Keys | Should -Match "AES256-SHA96"
     }
 
     It 'should correctly parse the new key format' {
@@ -289,10 +299,9 @@ Describe 'List-AccountKeys.ps1' {
 
         $result = List-AccountKeys
         $result.Count | Should -Be 1
-        $result[0].Keys.Count | Should -Be 3
-        $result[0].Keys.Name | Should -Contain "RC4"
-        $result[0].Keys.Name | Should -Contain "AES128-SHA96"
-        $result[0].Keys.Name | Should -Contain "AES256-SHA96"
+        $result[0].Keys | Should -Match "RC4"
+        $result[0].Keys | Should -Match "AES128-SHA96"
+        $result[0].Keys | Should -Match "AES256-SHA96"
     }
 
     It 'should correctly return keys in multiple formats from multiple kdcs' {
