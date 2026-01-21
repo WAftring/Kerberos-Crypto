@@ -308,7 +308,7 @@ Describe 'List-AccountKeys.ps1' {
             }
         }
 
-        $results = List-AccountKeys -SearchScope AllKdcs -Verbose -Debug
+        $results = List-AccountKeys -SearchScope AllKdcs
 
         $script:count | Should -Be 3
         $results.Count | Should -Be 5
