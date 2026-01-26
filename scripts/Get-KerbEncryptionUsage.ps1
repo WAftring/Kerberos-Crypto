@@ -70,6 +70,8 @@ enum RequestType {
 }
 
 class KerbRequest {
+    hidden [int]$RecordId
+    [string]$MachineName
     [DateTime]$Time
     [string]$Requestor
     [string]$Source
@@ -77,7 +79,10 @@ class KerbRequest {
     [RequestType]$Type
     [EncryptionType]$Ticket
     [EncryptionType]$SessionKey
-    KerbRequest([datetime]$tc, [string]$r, [string]$s, [string]$t, [RequestType]$rt, [EncryptionType]$te, [EncryptionType]$se) {
+
+    KerbRequest([int]$id, [string]$m, [datetime]$tc, [string]$r, [string]$s, [string]$t, [RequestType]$rt, [EncryptionType]$te, [EncryptionType]$se) {
+        $this.RecordId = $id
+        $this.MachineName = $m
         $this.Time = $tc
         if ($r.StartsWith("::ffff:")) {
             $r = $r.Replace("::ffff:", "")
@@ -88,6 +93,25 @@ class KerbRequest {
         $this.Type = $rt
         $this.Ticket = $te
         $this.SessionKey = $se
+    }
+
+    [string] GetEvtFilter() {
+        return @"
+<QueryList>
+  <Query Id="0" Path="Security">
+    <Select Path="Security">*[System[(EventRecordID=$($this.RecordId))]]</Select>
+  </Query>
+</QueryList>
+"@
+    }
+
+    [System.Diagnostics.Eventing.Reader.EventLogRecord] ShowEvent() {
+        $query = $this.GetEvtFilter()
+        if ($this.MachineName.ToUpper() -eq "$ENV:COMPUTERNAME`.$ENV:USERDNSDOMAIN") {
+            return Get-WinEvent -FilterXPath $query -LogName Security
+        } else {
+            return Get-WinEvent -FilterXPath $query -LogName Security -ComputerName $this.MachineName
+        }
     }
 }
 
@@ -147,6 +171,7 @@ function Get-KdcEventLog {
         [string]$Query
     )
     Write-Debug "Query:`n$Query to KDC '$KDCName'"
+    Write-Verbose "Attempting to query $KDCName"
     $Results = $null
     try {
         if ([string]::IsNullOrEmpty($KDCName)) {
@@ -158,7 +183,8 @@ function Get-KdcEventLog {
     }
     catch {
         if ($_.FullyQualifiedErrorId -eq "NoMatchingEventsFound,Microsoft.PowerShell.Commands.GetWinEventCommand") {
-            Write-Warning "No events found"
+            $RealKdcName = if ($null -eq $KDCName) { "$ENV:COMPUTERNAME" } else { $KDCName }
+            Write-Warning "No events found on $RealKdcName"
         }
         else {
             throw $_
@@ -199,9 +225,9 @@ function Get-EncryptionType {
         [int]$Value
     )
 
-    foreach($etype in $script:EncryptionTypes) {
+    foreach ($etype in $script:EncryptionTypes) {
         if (($PSCmdlet.ParameterSetName -eq "Name" -and $etype.Name -eq $Name) `
-            -or ($PSCmdlet.ParameterSetName -eq "Value" -and $etype.Value -eq $Value)) {
+                -or ($PSCmdlet.ParameterSetName -eq "Value" -and $etype.Value -eq $Value)) {
             return $etype
         }
     }
@@ -230,7 +256,7 @@ function Get-KerbEncryptionUsage {
     $Events = [System.Collections.ArrayList]::new()
     if ("AllKdcs" -eq $SearchScope) {
 
-        Get-ADDomainController -Service KDC -Discover | ForEach-Object {
+        Get-ADDomainController -Filter * | ForEach-Object {
             $KDCName = $_.HostName
             try {
                 [Array]$KdcResult = $(Get-KdcEventLog -KDCName $KDCName -Query $script:XPathQuery)
@@ -305,7 +331,7 @@ Please install the most recent Windows Updates available for this machine and at
         }
 
         if ($ShowRequest) {
-            [KerbRequest]::new($_.TimeCreated, $IP, $_.Properties[0].Value, $Target, $R, $T, $SK)
+            [KerbRequest]::new($_.RecordId, $_.MachineName, $_.TimeCreated, $IP, $_.Properties[0].Value, $Target, $R, $T, $SK)
         }
     }
 }

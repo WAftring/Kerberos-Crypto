@@ -33,52 +33,6 @@ param(
     [string]$SearchScope = "This"
 )
 
-#region Classes
-
-class EncryptionType {
-    [string]$Name
-    [int]$Value
-    EncryptionType([string]$name, [int]$value) {
-        $this.Name = $name
-        $this.Value = $value
-    }
-    [string]ToDataString() {
-        return "Data='0x{0:x}'" -f $this.Value
-    }
-
-    [string]ToString() {
-        return $this.Name
-    }
-
-    [bool]Equals([object]$other) {
-        if ($null -eq $other -or $this.GetType() -ne $other.GetType()) {
-            return $false
-        }
-        $EType = [EncryptionType]$other
-        return $EType.Name -eq $this.Name -and $EType.Value -eq $this.Value
-    }
-}
-
-$script:DES_CRC = [EncryptionType]::new("DES-CRC", 0x1)
-$script:DES_MD5 = [EncryptionType]::new("DES-MD5", 0x3)
-$script:RC4 = [EncryptionType]::new("RC4", 0x17)
-$script:AES128 = [EncryptionType]::new("AES128-SHA96", 0x11)
-$script:AES256 = [EncryptionType]::new("AES256-SHA96", 0x12)
-$script:AES128_SHA256 = [EncryptionType]::new("AES128-SHA256", 0x13)
-$script:AES256_SHA384 = [EncryptionType]::new("AES256-SHA384", 0x14)
-$script:UnknownEType = [EncryptionType]::new("Unknown", 0xFF)
-
-$script:EncryptionTypes = @(
-    $script:DES_CRC
-    $script:DES_MD5
-    $script:RC4
-    $script:AES128
-    $script:AES256
-    $script:AES128_SHA256
-    $script:AES256_SHA384
-    $script:UnknownEType
-)
-
 <#
     N.B(wiaftrin): On Windows Server 2022 the AES-SHA1 keys are aggregated into a single string.
     On Windows Server 2025+, the keys are called out individually.
@@ -96,12 +50,16 @@ enum AccountType {
 }
 
 class Account {
+    hidden [int]$RecordId
+    [string]$MachineName
     [datetime]$Time
     [string]$Name
     [AccountType]$Type
-    [EncryptionType[]]$Keys
+    [string]$Keys
 
-    Account([datetime]$tc, [string]$name, [AccountType]$ct, [string]$ckeys) {
+    Account([int]$id, [string]$m, [datetime]$tc, [string]$name, [AccountType]$ct, [string]$ckeys) {
+        $this.RecordId = $id
+        $this.MachineName = $m
         $this.Time = $tc
         $this.Name = $name
         $this.Type = $ct
@@ -109,15 +67,34 @@ class Account {
 
         $ckeys.Split(",").Trim() | ForEach-Object {
             if ($_ -eq $script:AES_SHA1_FILTER_2022) {
-                $tmp.Add($script:AES128)
-                $tmp.Add($script:AES256)
+                $tmp.Add("AES128-SHA96")
+                $tmp.Add("AES256-SHA96")
             }
             else  {
-                $tmp.Add($(Get-EncryptionType -Name $_))
+                $tmp.Add($_)
             }
         }
 
-        $this.Keys = $tmp.ToArray()
+        $this.Keys = $tmp -join '; ' # Using ; for CSV to be more CSV friendly
+    }
+
+    [string] GetEvtFilter() {
+        return @"
+<QueryList>
+  <Query Id="0" Path="Security">
+    <Select Path="Security">*[System[(EventRecordID=$($this.RecordId))]]</Select>
+  </Query>
+</QueryList>
+"@
+    }
+
+    [System.Diagnostics.Eventing.Reader.EventLogRecord] ShowEvent() {
+        $query = $this.GetEvtFilter()
+        if ($this.MachineName.ToUpper() -eq "$ENV:COMPUTERNAME`.$ENV:USERDNSDOMAIN") {
+            return Get-WinEvent -FilterXPath $query -LogName Security
+        } else {
+            return Get-WinEvent -FilterXPath $query -LogName Security -ComputerName $this.MachineName
+        }
     }
 }
 
@@ -140,28 +117,6 @@ $script:XPathQuery = @"
 </QueryList>
 "@
 
-
-
-function Get-EncryptionType {
-    param(
-        [Parameter(Mandatory = $true, ParameterSetName = "Name")]
-        [string]$Name,
-        [Parameter(Mandatory = $true, ParameterSetName = "Value")]
-        [int]$Value
-    )
-
-    foreach($etype in $script:EncryptionTypes) {
-        if (($PSCmdlet.ParameterSetName -eq "Name" -and $etype.Name -eq $Name) `
-            -or ($PSCmdlet.ParameterSetName -eq "Value" -and $etype.Value -eq $Value)) {
-            return $etype
-        }
-    }
-
-    return $script:UnknownEType
-}
-
-
-
 <#
     The new properties counts are 21 for 4769 and 24 for 4668. Meaning if we have a lower
     property count then we are reading the old event data.
@@ -181,6 +136,7 @@ function Get-AccountsFromKDC {
         [string]$Query
     )
     Write-Debug "Query:`n$Query to KDC '$KDCName'"
+    Write-Verbose "Attempting to query $KDCName"
     $Results = $null
     try {
         if ([string]::IsNullOrEmpty($KDCName)) {
@@ -192,7 +148,8 @@ function Get-AccountsFromKDC {
     }
     catch {
         if ($_.FullyQualifiedErrorId -eq "NoMatchingEventsFound,Microsoft.PowerShell.Commands.GetWinEventCommand") {
-            Write-Warning "No events found"
+            $RealKdcName = if ($null -eq $KDCName) { "$ENV:COMPUTERNAME" } else { $KDCName }
+            Write-Warning "No events found on $RealKdcName"
         }
         else {
             throw $_
@@ -247,7 +204,7 @@ function List-AccountKeys {
         }
     }
     else {
-        Get-ADDomainController -Service KDC -Discover | ForEach-Object {
+        Get-ADDomainController -Filter * | ForEach-Object {
             $KDCName = $_.HostName
 
             try {
@@ -270,11 +227,10 @@ Please install the most recent Windows Updates available for this machine and at
         return
     }
 
-    $originalLimit = $FormatEnumerationLimit
-    $FormatEnumerationLimit = -1
     Write-Verbose "Accounts returned: $($accounts.Count)"
 
     $accounts | ForEach-Object {
+        $KDC = $_.MachineName
         [string]$keys = $_.Properties[16].Value
         if (-not [string]::IsNullOrEmpty($script:NotKeyFilter)) {
             if ($keys.Contains($script:NotKeyFilter)) {
@@ -294,14 +250,14 @@ Please install the most recent Windows Updates available for this machine and at
             if ($target.EndsWith("$")) {
                 $type = [AccountType]::Machine
             }
-            [Account]::new($_.TimeCreated, $target, $type, $keys)
+            [Account]::new($_.RecordId, $KDC, $_.TimeCreated, $target, $type, $keys)
         }
         else {
-            [Account]::new($_.TimeCreated, $_.Properties[0].Value, [AccountType]::User, $keys)
+            $target = $_.Properties[0].Value
+            $type = if ($target.EndsWith("$")) {[AccountType]::Machine } else { [AccountType]::User }
+            [Account]::new($_.RecordId, $KDC, $_.TimeCreated, $target, $type, $keys)
         }
     }
-
-    $FormatEnumerationLimit = $originalLimit
 }
 
 #endregion
